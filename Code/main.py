@@ -6,7 +6,7 @@ from generate_train_from_24m import generate_train
 
 #首先对训练集和测试集都进行编码
 path = '../Data/'
-train_data, test_data = encode_train_test(path+'Handle/sales+search.csv', path+'evaluation_public.csv')
+train_data, eval_data = encode_train_test(path+'Handle/sales+search.csv', path+'evaluation_public.csv')
 
 #将每个省，每种车型的数据压缩成一行数据
 train_data = compress_24m(train_data)
