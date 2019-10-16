@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import xgboost as xgb
-'''import lightgbm as lgb'''
+import lightgbm as lgb
 from sklearn.metrics import mean_squared_error
 
 import gc
@@ -203,11 +203,9 @@ class BaseModel:
             cat_feats = data['cat_features'].copy()
 
 
-        '''trn_data = lgb.Dataset(train[features], label=train_target.values)
-        val_data = lgb.Dataset(valid[features], label=valid_target.values)'''
+        trn_data = lgb.Dataset(train[features], label=train_target.values)
+        val_data = lgb.Dataset(valid[features], label=valid_target.values)
         print(train['bodyType'].head())
-        trn_data = xgb.DMatrix(train[features], label=train_target.values)
-        val_data = xgb.DMatrix(valid[features], label=valid_target.values)
         feature_importance_df = pd.DataFrame()
 
         model = lgb.train(
@@ -253,7 +251,7 @@ params = {
     }
 
 
-'''baseModel = BaseModel()
+baseModel = BaseModel()
 pred_dict = {}
 for i in [1,2,3,4]:
     baseModel.genDataset(pred=pred_dict, month=i)
@@ -281,4 +279,4 @@ PRED = test['pred'].values
 submit = pd.read_csv('./data/evaluation_public.csv')
 submit['forecastVolum'] = PRED
 submit['forecastVolum'][submit['forecastVolum']<0] = 0
-submit[['id','forecastVolum']].round().astype(int).to_csv('submit.csv',encoding='utf8',index=False)'''
+submit[['id','forecastVolum']].round().astype(int).to_csv('../Data/Final/submit.csv',encoding='utf8',index=False)
