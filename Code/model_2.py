@@ -34,16 +34,18 @@ for i in ['bodyType', 'model']:
     data[i] = data[i].map(dict(zip(data[i].unique(), range(data[i].nunique()))))
 data['mt'] = (data['regYear'] - 2016) * 12 + data['regMonth']
 
-def get_stat_feature(df_):   
+def get_stat_feature(df_): 
+    '''每一个省的每一种车型在每一个月都有一条数据，该函数构造了从该月开始向后偏移1,2，……，12个月的销售量和流行程度。方法很巧妙'''
     df = df_.copy()
     stat_feat = []
     #构造出了两个组合特征model_adcode和model_adcode_mt
     df['model_adcode'] = df['adcode'] + df['model']
     df['model_adcode_mt'] = df['model_adcode'] * 100 + df['mt']
-    for col in tqdm(['label','popularity', 'newsReplyVolum', 'carCommentVolum']):
+    for col in tqdm(['label','popularity']):
         # shift
         for i in [1,2,3,4,5,6,7,8,9,10,11,12]:
             stat_feat.append('shift_model_adcode_mt_{}_{}'.format(col,i))
+            #此处最后+i就是为了最后构造偏移做准备，也就是绝对月份相同的同一个省的一种车型的model_adcode_mt_{}_{}一定是相同的
             df['model_adcode_mt_{}_{}'.format(col,i)] = df['model_adcode_mt'] + i
             df_last = df[~df[col].isnull()].set_index('model_adcode_mt_{}_{}'.format(col,i))
             df['shift_model_adcode_mt_{}_{}'.format(col,i)] = df['model_adcode_mt'].map(df_last[col])    
@@ -89,10 +91,10 @@ def get_model_type(train_x,train_y,valid_x,valid_y,m_type='lgb'):
 def get_train_model(df_, m, m_type='lgb'):
     df = df_.copy()
     # 数据集划分
-    st = 13
-    all_idx   = (df['mt'].between(st , m-1))
-    train_idx = (df['mt'].between(st , m-5))
-    valid_idx = (df['mt'].between(m-4, m-4))
+    st = 1
+    all_idx   = (df['mt'].between(st , m-13))
+    train_idx = (df['mt'].between(st , m-13))
+    valid_idx = (df['mt'].between(m-12, m-12))
     test_idx  = (df['mt'].between(m  , m  ))
     print('all_idx  :',st ,m-1)
     print('train_idx:',st ,m-5)
@@ -124,6 +126,25 @@ def get_train_model(df_, m, m_type='lgb'):
     sub['forecastVolum'] = df[test_idx]['forecastVolum'].apply(lambda x: 0 if x < 0 else x).round().astype(int)  
     return sub,df[valid_idx]['pred_label']
 
+def trend_factor(data):
+    '''计算趋势因子'''
+    for col in ['adcode', 'model', 'model_adcode']:
+        temp_df = pd.DataFrame(columns=[col, 'factor_{}'.format(col)])
+        year_1 = (data['mt'].between(1, 12))
+        year_2 = (data['mt'].between(13, 24))
+        i = 0
+        for df in data[col].unique():
+            temp1 = data[(data[col] == df) & (year_1)]
+            temp2 = data[(data[col] == df) & (year_2)]
+            sum1 = temp1['label'].sum()
+            sum2 = temp2['label'].sum()
+            factor = sum2 / sum1
+            temp_df.loc[i] = {col:df, 'factor_{}'.format(col):factor}
+            i = i+1
+        data = data.merge(temp_df, how='left', on=[col])
+    return data
+
+
 for month in [25,26,27,28]: 
     m_type = 'xgb' 
     
@@ -143,9 +164,13 @@ for month in [25,26,27,28]:
     features = num_feat + cate_feat
     print(len(features), len(set(features)))   
     
-    sub,val_pred = get_train_model(data_df, month, m_type)   
+    sub,val_pred = get_train_model(data_df, month, m_type)
+    #将预测出来的结果再重新加入训练文件，以得到下一个月的结果
     data.loc[(data.regMonth==(month-24))&(data.regYear==2018), 'salesVolume'] = sub['forecastVolum'].values
-    data.loc[(data.regMonth==(month-24))&(data.regYear==2018), 'label'      ] = sub['forecastVolum'].values	
+    data.loc[(data.regMonth==(month-24))&(data.regYear==2018), 'label'      ] = sub['forecastVolum'].values
+ratio = trend_factor(data_df)
+print('ratio is: ' + str(ratio))
 sub = data.loc[(data.regMonth>=1)&(data.regYear==2018), ['id','salesVolume']]
 sub.columns = ['id','forecastVolum']
-sub[['id','forecastVolum']].round().astype(int).to_csv('CCF_sales_xgb.csv', index=False)
+sub['forecastVolum'].apply(lambda x: x * ratio)
+sub[['id','forecastVolum']].round().astype(int).to_csv('../Data/Final/model_2_1.csv', index=False)
