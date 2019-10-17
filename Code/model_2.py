@@ -144,6 +144,24 @@ def trend_factor(data):
         data = data.merge(temp_df, how='left', on=[col])
     return data
 
+def average_three(data):
+    '''构造该月份对应上一年的该月份，该月份的前一个月和该月份的后一个月的平均值，作为新特征'''
+    #df['aver'] = 0
+    for i in [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]:
+        for df in data['model_adcode'].unique():
+            if (i == 13):
+                temp1 = data[(data['model_adcode'] == df) & (data['mt'] == i-12)]['label']
+                temp2 = data[(data['model_adcode'] == df) & (data['mt'] == i-11)]['label']
+                aver = (temp1+temp2)/2
+                data[(data['model_adcode'] == df) & (data['mt'] == i-11)]['aver'] = aver
+            elif (i >= 13):
+                temp1 = data[(data['model_adcode'] == df) & (data['mt'] == i-12)]['label']
+                temp2 = data[(data['model_adcode'] == df) & (data['mt'] == i-11)]['label']
+                temp3 = data[(data['model_adcode'] == df) & (data['mt'] == i-10)]['label']
+                aver = (temp1+temp2+temp3)/3
+                data[(data['model_adcode'] == df) & (data['mt'] == i-11)]['aver'] = aver
+    return data
+
 
 for month in [25,26,27,28]: 
     m_type = 'xgb' 
