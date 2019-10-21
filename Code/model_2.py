@@ -174,3 +174,4 @@ sub = data.loc[(data.regMonth>=1)&(data.regYear==2018), ['id','salesVolume']]
 sub.columns = ['id','forecastVolum']
 sub['forecastVolum'].apply(lambda x: x * ratio)
 sub[['id','forecastVolum']].round().astype(int).to_csv('../Data/Final/model_2_1.csv', index=False)
+
