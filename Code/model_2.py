@@ -162,13 +162,71 @@ def average_three(data):
                 data[(data['model_adcode'] == df) & (data['mt'] == i-11)]['aver'] = aver
     return data
 
+#与correlation函数配套使用
+def combine(data, result, mt):
+    origin = data.copy()
+    df1 = data.copy()
+    df2 = result.copy()
+    df1 = df1[(df1['mt'] == mt)]
+    df1.drop(['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'], axis=1, inplace=True)
+    df1 = df1.merge(df2, on=['model', 'adcode', 'mt'])
+    origin = origin[~(origin['mt'] == mt)]
+    n_data = pd.concat([origin, df1], axis=1)
+    print(n_data.head())
+    return n_data
+
+#计算每种车型销量相关系数
+def correlation(data, start, end, mode=0):
+    cor = pd.DataFrame()
+    for m in tqdm(data['model'].unique()):
+        temp = []
+        for i in range(1, 24):
+            val1 = data[(data['model'] == m) & (data['mt'] == i)]['salesVolume'].sum()
+            val2 = data[(data['model'] == m) & (data['mt'] == i+1)]['salesVolume'].sum()
+            gap = val2-val1
+            temp.append(gap)
+        cor[m] = temp
+    cor = cor.corr()
+    top10 = pd.DataFrame()
+    for col in cor.columns:
+        temp = cor[col].sort_values(ascending=False)
+        index = temp.index.tolist()[1:11]
+        top10[col] = index
+    '''top10的列分别是model编号，10行代表对应model中的相关系数最高的10种车型'''
+    result = pd.DataFrame(columns=['model', 'adcode', 'mt', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'])
+    for i in top10.columns:
+        temp = pd.DataFrame(columns=['model', 'adcode', 'mt', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'])
+        for k in data['adcode'].unique():
+            for j in range(start,end):
+                line = {'model':i, 'mt':j, 'adcode':k,
+                        'c1':data[(data['model']==top10.iloc[0,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c2':data[(data['model']==top10.iloc[1,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0], 
+                        'c3':data[(data['model']==top10.iloc[2,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c4':data[(data['model']==top10.iloc[3,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c5':data[(data['model']==top10.iloc[4,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c6':data[(data['model']==top10.iloc[5,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c7':data[(data['model']==top10.iloc[6,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c8':data[(data['model']==top10.iloc[7,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c9':data[(data['model']==top10.iloc[8,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0],
+                        'c10':data[(data['model']==top10.iloc[9,i])&(data['adcode']==k)&(data['mt']==j-1)]['salesVolume'].values[0]}
+                print(line)
+                result = result.append(line, ignore_index=True)
+    print(result)
+    print(data.head())
+    if mode == 0:
+        data = data.merge(result)
+    elif mode == 1:
+        data = combine(data, result, start)
+    print(data)
+    return data
 
 for month in [25,26,27,28]: 
     m_type = 'xgb' 
     
     data_df, stat_feat = get_stat_feature(data)
+    data_df = correlation(data_df, 13, month+1)
     
-    num_feat = ['regYear'] + stat_feat
+    num_feat = ['regYear'] + stat_feat + ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10']
     cate_feat = ['adcode','bodyType','model','regMonth']
     
     if m_type == 'lgb':
@@ -186,10 +244,11 @@ for month in [25,26,27,28]:
     #将预测出来的结果再重新加入训练文件，以得到下一个月的结果
     data.loc[(data.regMonth==(month-24))&(data.regYear==2018), 'salesVolume'] = sub['forecastVolum'].values
     data.loc[(data.regMonth==(month-24))&(data.regYear==2018), 'label'      ] = sub['forecastVolum'].values
-ratio = trend_factor(data_df)
-print('ratio is: ' + str(ratio))
+#ratio = trend_factor(data_df)
+#print('ratio is: ' + str(ratio))
 sub = data.loc[(data.regMonth>=1)&(data.regYear==2018), ['id','salesVolume']]
+print(sub)
 sub.columns = ['id','forecastVolum']
-sub['forecastVolum'].apply(lambda x: x * ratio)
-sub[['id','forecastVolum']].round().astype(int).to_csv('../Data/Final/model_2_1.csv', index=False)
+#sub['forecastVolum'] = sub['forecastVolum'].apply(lambda x: x * ratio) 
+sub[['id','forecastVolum']].round().astype(int).to_csv('../Data/Final/model_2_2.csv', index=False)
 
